@@ -165,7 +165,8 @@ class TestPerfParser : public QObject
 private slots:
     void initTestCase()
     {
-        if (!PerfRecord::isPerfInstalled()) {
+        PerfRecord record;
+        if (!record.isPerfInstalled()) {
             QSKIP("perf is not available, cannot run integration tests.");
         }
 
@@ -217,10 +218,12 @@ private slots:
     {
         QTest::addColumn<QStringList>("otherOptions");
 
+        PerfRecord record;
+
         QTest::addRow("normal") << QStringList();
-        if (PerfRecord::canUseAio())
+        if (record.canUseAio())
             QTest::addRow("aio") << QStringList("--aio");
-        if (PerfRecord::canCompress())
+        if (record.canCompress())
             QTest::addRow("zstd") << QStringList("-z");
     }
 
@@ -496,7 +499,8 @@ private slots:
 
     void testOffCpu()
     {
-        if (!PerfRecord::canProfileOffCpu()) {
+        PerfRecord record;
+        if (!record.canProfileOffCpu()) {
             QSKIP("cannot access sched_switch trace points. execute the following to run this test:\n"
                   "    sudo mount -o remount,mode=755 /sys/kernel/debug{,/tracing} with mode=755");
         }
@@ -542,7 +546,9 @@ private slots:
             QSKIP("no sleep command available");
         }
 
-        if (!PerfRecord::canProfileOffCpu()) {
+        PerfRecord record;
+
+        if (!record.canProfileOffCpu()) {
             QSKIP("cannot access sched_switch trace points. execute the following to run this test:\n"
                   "    sudo mount -o remount,mode=755 /sys/kernel/debug{,/tracing} with mode=755");
         }
@@ -569,8 +575,9 @@ private slots:
 
     void testSampleCpu()
     {
+        PerfRecord record;
         QStringList perfOptions = {"--call-graph", "dwarf", "--sample-cpu", "-e", "cycles"};
-        if (PerfRecord::canProfileOffCpu()) {
+        if (record.canProfileOffCpu()) {
             perfOptions += PerfRecord::offCpuProfilingOptions();
         }
 
@@ -590,7 +597,7 @@ private slots:
         QCOMPARE(m_eventData.threads.size(), numThreads + 1);
         QCOMPARE(m_eventData.cpus.size(), numThreads);
 
-        if (PerfRecord::canProfileOffCpu()) {
+        if (record.canProfileOffCpu()) {
             QCOMPARE(m_bottomUpData.costs.numTypes(), 3);
             QCOMPARE(m_bottomUpData.costs.typeName(0), QStringLiteral("cycles"));
             QCOMPARE(m_bottomUpData.costs.typeName(1), QStringLiteral("sched:sched_switch"));
