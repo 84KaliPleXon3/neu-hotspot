@@ -7,11 +7,19 @@
 
 #pragma once
 
-class QString;
-class QStringList;
-class QProcessEnvironment;
+#include <memory>
 
-QStringList assembleSSHArguments(const QString& deviceName, const QStringList& command);
-QProcessEnvironment sshEnvironment();
+#include <QString>
+
+class QStringList;
+class QProcess;
+
+// used in the dialog to test connection and copy ssh keys
+std::unique_ptr<QProcess> createSshProcess(const QString& username, const QString& hostname, const QString& options,
+                                           const QStringList& command,
+                                           const QString& executable = QStringLiteral("ssh"));
+
+// used when recording
+std::unique_ptr<QProcess> createSshProcess(const QString& deviceName, const QStringList& command);
 QString sshOutput(const QString& deviceName, const QStringList& command);
 int sshExitCode(const QString& deviceName, const QStringList& command);

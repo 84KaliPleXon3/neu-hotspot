@@ -11,6 +11,7 @@
 #include "ui_debuginfodpage.h"
 #include "ui_flamegraphsettingspage.h"
 #include "ui_unwindsettingspage.h"
+#include "ui_sshsettingspage.h"
 
 #include <KComboBox>
 #include <KUrlRequester>
@@ -20,15 +21,17 @@
 #include <QLineEdit>
 #include <settings.h>
 #include <QListView>
+#include <QProcess>
 
 #include "multiconfigwidget.h"
+#include "ssh.h"
 
 #include "hotspot-config.h"
 
 namespace {
-KConfigGroup config()
+auto config()
 {
-    return KSharedConfig::openConfig()->group("PerfPaths");
+    return KSharedConfig::openConfig();
 }
 }
 
@@ -40,6 +43,7 @@ SettingsDialog::SettingsDialog(QWidget* parent)
 #if KGRAPHVIEWER_FOUND
     , callgraphPage(new Ui::CallgraphSettingsPage)
 #endif
+    , sshPage(new Ui::SshSettingsPage)
 {
     addPathSettingsPage();
     addFlamegraphPage();
@@ -47,6 +51,7 @@ SettingsDialog::SettingsDialog(QWidget* parent)
 #if KGRAPHVIEWER_FOUND
     addCallgraphPage();
 #endif
+    addSshPage();
 }
 
 SettingsDialog::~SettingsDialog() = default;
@@ -148,9 +153,11 @@ void SettingsDialog::addPathSettingsPage()
     auto lastExtraLibsWidget = setupMultiPath(unwindPage->extraLibraryPaths, unwindPage->extraLibraryPathsLabel,
                                               unwindPage->lineEditApplicationPath);
     setupMultiPath(unwindPage->debugPaths, unwindPage->debugPathsLabel, lastExtraLibsWidget);
-    
+
     auto* label = new QLabel(this);
     label->setText(tr("Config:"));
+
+    auto pathConfig = config()->group("PerfPaths");
 
     auto saveFunction = [this](KConfigGroup group) {
         group.writeEntry("sysroot", sysroot());
@@ -162,7 +169,7 @@ void SettingsDialog::addPathSettingsPage()
         group.writeEntry("objdump", objdump());
     };
 
-    auto restoreFunction = [this](const KConfigGroup& group) {
+    auto restoreFunction = [this, &pathConfig](const KConfigGroup& group) {
         const auto sysroot = group.readEntry("sysroot");
         const auto appPath = group.readEntry("appPath");
         const auto extraLibPaths = group.readEntry("extraLibPaths");
@@ -171,11 +178,11 @@ void SettingsDialog::addPathSettingsPage()
         const auto arch = group.readEntry("arch");
         const auto objdump = group.readEntry("objdump");
         initSettings(sysroot, appPath, extraLibPaths, debugPaths, kallsyms, arch, objdump);
-        ::config().writeEntry("lastUsed", m_configs->currentConfig());
+        pathConfig.writeEntry("lastUsed", m_configs->currentConfig());
     };
 
     m_configs = new MultiConfigWidget(this);
-    m_configs->setConfig(config());
+    m_configs->setConfig(pathConfig);
     m_configs->restoreCurrent();
 
     connect(m_configs, &MultiConfigWidget::saveConfig, this, saveFunction);
@@ -292,4 +299,111 @@ void SettingsDialog::addCallgraphPage()
         settings->setCallgraphColors(callgraphPage->currentFunctionColor->color().name(),
                                      callgraphPage->functionColor->color().name());
     });
+}
+
+void SettingsDialog::addSshPage()
+{
+    const auto sshPath = QStandardPaths::findExecutable(QStringLiteral("ssh"));
+
+    // only show page if ssh is installed
+    if (sshPath.isEmpty()) {
+        return;
+    }
+
+    auto page = new QWidget(this);
+    auto item = addPage(page, tr("SSH"));
+    item->setHeader(tr("SSH Settings"));
+    item->setIcon(QIcon::fromTheme(QStringLiteral("preferences-system-windows-behavior")));
+
+    sshPage->setupUi(page);
+
+    auto deviceConfig = config()->group("devices");
+
+    auto saveFunction = [this](KConfigGroup group) {
+        group.writeEntry("hostname", sshPage->hostnameLineEdit->text());
+        group.writeEntry("username", sshPage->usernameLineEdit->text());
+        group.writeEntry("sshoptions", sshPage->sshOptionsLineEdit->text());
+    };
+
+    auto restoreFunction = [this](const KConfigGroup& group) {
+        const auto hostname = group.readEntry("hostname");
+        const auto username = group.readEntry("username");
+        const auto sshOptions = group.readEntry("sshoptions");
+
+        sshPage->hostnameLineEdit->setText(hostname);
+        sshPage->usernameLineEdit->setText(username);
+        sshPage->sshOptionsLineEdit->setText(sshOptions);
+    };
+
+    MultiConfigWidget* devices = new MultiConfigWidget(this);
+
+    // TODO: fix tab order
+
+    connect(devices, &MultiConfigWidget::saveConfig, this, saveFunction);
+    connect(devices, &MultiConfigWidget::restoreConfig, this, restoreFunction);
+
+    devices->setConfig(deviceConfig);
+    devices->restoreCurrent();
+
+    sshPage->groupBox->layout()->replaceWidget(sshPage->multiConfigWidget, devices);
+
+    Settings* settings = Settings::instance();
+    sshPage->sshaskpassLineEdit->setText(settings->sshaskPassPath());
+
+    connect(settings, &Settings::sshaskPassChanged, this,
+            [this](const QString& path) { sshPage->sshaskpassLineEdit->setText(path); });
+
+    connect(sshPage->testButton, &QPushButton::pressed, this, [this, devices] {
+        auto ssh = createSshProcess(sshPage->hostnameLineEdit->text(), sshPage->usernameLineEdit->text(),
+                                    sshPage->sshOptionsLineEdit->text(), QStringList({QStringLiteral("perf")}));
+
+        connect(ssh.get(), static_cast<void (QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished), this,
+                [this, &ssh, devices](int exitCode, QProcess::ExitStatus exitStatus) {
+                    Q_UNUSED(exitStatus);
+
+                    auto showError = [this](const QString& errorText) {
+                        sshPage->errorMessageWidget->setText(errorText);
+                        sshPage->errorMessageWidget->show();
+                    };
+
+                    const auto hostname = sshPage->hostnameLineEdit->text();
+
+                    if (exitCode == 255) {
+                        showError(tr("Failed to connect to %1").arg(hostname));
+                    } else if (exitCode == 127) {
+                        showError(tr("Could not find perf binary"));
+                    } else if (exitCode == 1) {
+                        sshPage->successMessageWidget->setText(tr("Successfully connected to %1").arg(hostname));
+                        sshPage->successMessageWidget->show();
+                        devices->updateCurrentConfig();
+                    } else {
+                        showError(tr("Error: %1").arg(QString::fromUtf8(ssh->readAllStandardError())));
+                    }
+                });
+
+        ssh->start();
+    });
+
+    connect(sshPage->copyKeyButton, &QPushButton::pressed, this, [this, devices] {
+        auto sshCopyId = createSshProcess(sshPage->hostnameLineEdit->text(), sshPage->usernameLineEdit->text(),
+                                          sshPage->sshOptionsLineEdit->text(), QStringList({QStringLiteral("perf")}),
+                                          QLatin1String("ssh-copy-id"));
+
+        connect(sshCopyId.get(), static_cast<void (QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished), this,
+                [this, &sshCopyId](int exitCode, QProcess::ExitStatus exitStatus) {
+                    Q_UNUSED(exitStatus);
+                    if (exitCode == 1) {
+                        sshPage->errorMessageWidget->setText(QString::fromUtf8(sshCopyId->readAllStandardError()));
+                        sshPage->errorMessageWidget->show();
+                    } else {
+                        sshPage->successMessageWidget->setText(tr("Successfully installed ssh key"));
+                        sshPage->successMessageWidget->show();
+                    }
+                });
+
+        sshCopyId->start();
+    });
+
+    sshPage->errorMessageWidget->setVisible(false);
+    sshPage->successMessageWidget->setVisible(false);
 }
