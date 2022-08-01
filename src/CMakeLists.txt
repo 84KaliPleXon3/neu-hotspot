@@ -40,6 +40,7 @@ set(hotspot_SRCS
     resultscallercalleepage.cpp
     resultsdisassemblypage.cpp
     resultsutil.cpp
+    resultspagediff.cpp
     costheaderview.cpp
     timelinewidget.cpp
     dockwidgetsetup.cpp
@@ -62,6 +63,7 @@ set(hotspot_SRCS
     resultsflamegraphpage.ui
     resultscallercalleepage.ui
     resultsdisassemblypage.ui
+    resultspagediff.ui
     timelinewidget.ui
     unwindsettingspage.ui
     flamegraphsettingspage.ui
