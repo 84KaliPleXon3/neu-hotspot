@@ -13,6 +13,7 @@
 #include <QDebug>
 #include <QDir>
 #include <QFileInfo>
+#include <QFontMetrics>
 #include <QProcessEnvironment>
 #include <QStandardPaths>
 
@@ -31,6 +32,28 @@
 #endif
 
 #include <KParts/ReadOnlyPart>
+
+namespace {
+QString elideArguments(const QString symbolText)
+{
+    int startEliding = symbolText.indexOf(QLatin1Char('('));
+
+    if (startEliding == -1) {
+        return symbolText;
+    }
+
+    int endEliding = symbolText.indexOf(QLatin1Char(')'), startEliding);
+
+    if (endEliding - startEliding == 1) {
+        // don't elide if we have () in symbol
+        return symbolText;
+    }
+
+    // QLatin1String does not work with …
+    const auto elideSymbol = QString::fromUtf8("…");
+    return symbolText.leftRef(startEliding + 1) + elideSymbol + symbolText.rightRef(symbolText.length() - endEliding);
+}
+}
 
 QString collapseTemplate(const QString& str, int level)
 {
@@ -93,6 +116,25 @@ QString collapseTemplate(const QString& str, int level)
     }
 
     return output;
+}
+
+QString Util::elideSymbol(const QString& symbolText, const QFontMetrics& metrics, int maxWidth)
+{
+    if (metrics.horizontalAdvance(symbolText) < maxWidth) {
+        return symbolText;
+    }
+
+    const auto argumentsElided = elideArguments(symbolText);
+    if (metrics.horizontalAdvance(argumentsElided) < maxWidth) {
+        return argumentsElided;
+    }
+
+    const auto templateElided = collapseTemplate(argumentsElided, 1);
+    if (metrics.horizontalAdvance(templateElided) < maxWidth) {
+        return templateElided;
+    }
+
+    return metrics.elidedText(templateElided, Qt::TextElideMode::ElideLeft, maxWidth);
 }
 
 QString Util::findLibexecBinary(const QString& name)
