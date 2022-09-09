@@ -276,13 +276,14 @@ void buildPerLibrary(const TopDown* node, PerLibraryResults& results, QHash<QStr
     }
 }
 
-void diffBottomUpResults(const BottomUp& a, const BottomUp* b, BottomUp* result_node, const Costs& costs_a,
-                         const Costs& costs_b, Costs* costs_result)
+template<typename ResultType, bool addResultNode = true>
+void diffResults(const ResultType& a, const ResultType* b, ResultType* result_node, const Costs& costs_a,
+                 const Costs& costs_b, Costs* costs_result)
 {
     for (const auto& node : a.children) {
         const auto sibling = b->entryForSymbol(node.symbol);
         if (sibling) {
-            BottomUp diffed;
+            ResultType diffed;
             diffed.id = node.id;
             diffed.symbol = node.symbol;
 
@@ -291,8 +292,10 @@ void diffBottomUpResults(const BottomUp& a, const BottomUp* b, BottomUp* result_
                 costs_result->add(2 * i + 1, diffed.id, costs_b.cost(i, sibling->id));
             }
 
-            result_node->children.push_back(diffed);
-            diffBottomUpResults(node, sibling, &result_node->children.back(), costs_a, costs_b, costs_result);
+            if (addResultNode) {
+                result_node->children.push_back(diffed);
+            }
+            diffResults(node, sibling, &result_node->children.back(), costs_a, costs_b, costs_result);
         }
     }
 }
@@ -415,9 +418,52 @@ Data::BottomUpResults Data::BottomUpResults::diffBottomUpResults(const Data::Bot
         results.costs.addTotalCost(costBType, b.costs.totalCost(0));
     }
 
-    ::diffBottomUpResults(a.root, &b.root, &results.root, a.costs, b.costs, &results.costs);
+    diffResults(a.root, &b.root, &results.root, a.costs, b.costs, &results.costs);
 
     Data::BottomUp::initializeParents(&results.root);
+
+    return results;
+}
+
+Data::TopDownResults Data::TopDownResults::diffTopDownResults(const Data::TopDownResults& a,
+                                                              const Data::TopDownResults& b)
+{
+    if (a.selfCosts.numTypes() != b.selfCosts.numTypes()) {
+        return {};
+    }
+
+    TopDownResults results;
+
+    // mimic perf diff -c ratio
+    for (int i = 0; i < a.selfCosts.numTypes(); i++) {
+        // only diff same type of costs
+        if (a.selfCosts.typeName(i) != b.selfCosts.typeName(i)) {
+            return {};
+        }
+
+        results.selfCosts.addType(2 * i, QLatin1String("baseline %1").arg(a.selfCosts.typeName(i)),
+                                  a.selfCosts.unit(i));
+        results.selfCosts.addTotalCost(2 * i, a.selfCosts.totalCost(i));
+
+        results.inclusiveCosts.addType(2 * i, QLatin1String("baseline %1").arg(a.inclusiveCosts.typeName(i)),
+                                       a.inclusiveCosts.unit(i));
+        results.inclusiveCosts.addTotalCost(2 * i, a.inclusiveCosts.totalCost(i));
+
+        const auto costBType = 2 * i + 1;
+        results.selfCosts.addType(costBType, QLatin1String("ratio of %1").arg(b.selfCosts.typeName(i)),
+                                  Costs::Unit::Unknown);
+        results.selfCosts.addTotalCost(costBType, b.selfCosts.totalCost(0));
+
+        results.inclusiveCosts.addType(costBType, QLatin1String("ratio of %1").arg(b.inclusiveCosts.typeName(i)),
+                                       Costs::Unit::Unknown);
+        results.inclusiveCosts.addTotalCost(costBType, b.inclusiveCosts.totalCost(0));
+    }
+
+    diffResults(a.root, &b.root, &results.root, a.selfCosts, b.selfCosts, &results.selfCosts);
+    diffResults<TopDown, false>(a.root, &b.root, &results.root, a.inclusiveCosts, b.inclusiveCosts,
+                                &results.inclusiveCosts);
+
+    Data::TopDown::initializeParents(&results.root);
 
     return results;
 }

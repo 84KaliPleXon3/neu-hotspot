@@ -472,6 +472,8 @@ struct TopDownResults
     Costs selfCosts;
     Costs inclusiveCosts;
     static TopDownResults fromBottomUp(const Data::BottomUpResults& bottomUpData);
+
+    static TopDownResults diffTopDownResults(const Data::TopDownResults& a, const Data::TopDownResults& b);
 };
 
 struct PerLibrary : SymbolTree<PerLibrary>

@@ -146,9 +146,14 @@ ResultsPageDiff::ResultsPageDiff(QWidget* parent)
     }
 
     connect(this, &ResultsPageDiff::parsingFinished, this, [this] {
-        const auto bottomUpData =
+        auto bottomUpData =
             Data::BottomUpResults::diffBottomUpResults(m_fileA->bottomUpResults(), m_fileB->bottomUpResults());
         m_resultsBottomUpPage->setBottomUpResults(bottomUpData);
+
+        auto topDownData =
+            Data::TopDownResults::diffTopDownResults(Data::TopDownResults::fromBottomUp(m_fileA->bottomUpResults()),
+                                                     Data::TopDownResults::fromBottomUp(m_fileB->bottomUpResults()));
+        m_resultsTopDownPage->setTopDownResults(topDownData);
     });
 
     {

@@ -85,7 +85,6 @@ void ResultsBottomUpPage::setBottomUpResults(const Data::BottomUpResults& result
     m_model->setData(results);
     ResultsUtil::hideEmptyColumns(results.costs, ui->bottomUpTreeView, BottomUpModel::NUM_BASE_COLUMNS);
 
-    {
         auto stackCollapsed =
             m_exportMenu->addMenu(QIcon::fromTheme(QStringLiteral("text-plain")), tr("Stack Collapsed"));
         stackCollapsed->setToolTip(tr("Export data in textual form compatible with <tt>flamegraph.pl</tt>."));
@@ -104,5 +103,4 @@ void ResultsBottomUpPage::setBottomUpResults(const Data::BottomUpResults& result
                 stackCollapsedExport(file, i, m_model->results());
             });
         }
-    }
 }

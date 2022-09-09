@@ -18,7 +18,7 @@ class ResultsBottomUpPage;
 
 namespace Data {
 struct Symbol;
-class BottomUpResults;
+struct BottomUpResults;
 }
 
 class QTreeView;
