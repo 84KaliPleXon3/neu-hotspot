@@ -28,7 +28,8 @@ ResultsTopDownPage::ResultsTopDownPage(FilterAndZoomStack* filterStack, PerfPars
     ResultsUtil::setupCostDelegate(m_model, ui->topDownTreeView);
     ResultsUtil::setupContextMenu(ui->topDownTreeView, contextMenu, m_model, filterStack, this);
 
-    connect(parser, &PerfParser::topDownDataAvailable, this, &ResultsTopDownPage::setTopDownResults);
+    if (parser)
+        connect(parser, &PerfParser::topDownDataAvailable, this, &ResultsTopDownPage::setTopDownResults);
 
     ResultsUtil::setupResultsAggregation(ui->costAggregationComboBox);
 }

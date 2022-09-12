@@ -47,7 +47,7 @@ ResultsPageDiff::ResultsPageDiff(QWidget* parent)
     , m_exportMenu(new QMenu(tr("Export"), this))
     , m_resultsBottomUpPage(
           new ResultsBottomUpPage(m_filterAndZoomStack, nullptr, m_costContextMenu, m_exportMenu, this))
-    , m_resultsTopDownPage(new ResultsTopDownPage(m_filterAndZoomStack, m_fileA, m_costContextMenu, this))
+    , m_resultsTopDownPage(new ResultsTopDownPage(m_filterAndZoomStack, nullptr, m_costContextMenu, this))
     , m_resultsFlameGraphPage(new ResultsFlameGraphPage(m_filterAndZoomStack, m_fileA, m_exportMenu, this))
     , m_resultsCallerCalleePage(new ResultsCallerCalleePage(m_filterAndZoomStack, m_fileA, m_costContextMenu, this))
     , m_timeLineWidget(new TimeLineWidget(m_fileA, m_filterMenu, m_filterAndZoomStack, this))

@@ -68,7 +68,8 @@ ResultsBottomUpPage::ResultsBottomUpPage(FilterAndZoomStack* filterStack, PerfPa
     ResultsUtil::setupCostDelegate(m_model, ui->bottomUpTreeView);
     ResultsUtil::setupContextMenu(ui->bottomUpTreeView, contextMenu, m_model, filterStack, this);
 
-    connect(parser, &PerfParser::bottomUpDataAvailable, this, &ResultsBottomUpPage::setBottomUpResults);
+    if (parser)
+        connect(parser, &PerfParser::bottomUpDataAvailable, this, &ResultsBottomUpPage::setBottomUpResults);
 
     ResultsUtil::setupResultsAggregation(ui->costAggregationComboBox);
 }
