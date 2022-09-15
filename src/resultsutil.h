@@ -45,6 +45,15 @@ void setupTreeView(QTreeView* view, CostContextMenu* costContextMenu, QLineEdit*
                   Model::SortRole);
 }
 
+template<typename Model>
+void setupTreeViewDiff(QTreeView* view, CostContextMenu* costContextMenu, QLineEdit* filter, Model* model)
+{
+    auto* proxy = new CostProxyDiff<Model>(view);
+    proxy->setSourceModel(model);
+    setupTreeView(view, costContextMenu, filter, qobject_cast<QSortFilterProxyModel*>(proxy), Model::InitialSortColumn,
+                  Model::SortRole);
+}
+
 void setupCostDelegate(QAbstractItemModel* model, QTreeView* view, int sortRole, int totalCostRole, int numBaseColumns);
 
 template<typename Model>

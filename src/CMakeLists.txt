@@ -50,6 +50,7 @@ set(hotspot_SRCS
     perfoutputwidgettext.cpp
     perfoutputwidgetkonsole.cpp
     costcontextmenu.cpp
+    diffreportdialog.cpp
 
     # ui files:
     mainwindow.ui
@@ -71,6 +72,7 @@ set(hotspot_SRCS
     callgraphwidget.ui
     callgraphsettingspage.ui
     frequencypage.ui
+    diffreportdialog.ui
 
     # resources:
     resources.qrc

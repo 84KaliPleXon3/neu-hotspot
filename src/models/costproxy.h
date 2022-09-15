@@ -10,6 +10,7 @@
 
 #include <QSortFilterProxyModel>
 
+#include "../util.h"
 #include "callercalleeproxy.h"
 
 template<typename Model>
@@ -37,5 +38,52 @@ protected:
         }
 
         return CallerCalleeProxyDetail::match(this, item->symbol);
+    }
+};
+
+template<typename Model>
+class CostProxyDiff : public CostProxy<Model>
+{
+public:
+    explicit CostProxyDiff(QObject* parent = nullptr)
+        : CostProxy<Model>(parent)
+    {
+    }
+
+    QVariant data(const QModelIndex& index, int role) const override
+    {
+        if (index.column() >= Model::NUM_BASE_COLUMNS) {
+            const auto model = qobject_cast<Model*>(CostProxy<Model>::sourceModel());
+            Q_ASSERT(model);
+
+            const auto node = model->itemFromIndex(CostProxy<Model>::mapToSource(index));
+
+            const auto baseColumn = (index.column() - Model::NUM_BASE_COLUMNS) / 2;
+            const auto column = baseColumn + (index.column() - Model::NUM_BASE_COLUMNS) % 2;
+
+            auto cost = [model, node](int column) -> float { return model->results().costs.cost(column, node->id); };
+
+            auto totalCost = [model](int column) -> float { return model->results().costs.totalCost(column); };
+
+            if (column == baseColumn) {
+                if (role == Model::TotalCostRole) {
+                    return totalCost(column);
+                } else if (role == Model::SortRole) {
+                    return cost(column) / totalCost(column);
+                } else if (role == Qt::DisplayRole) {
+                    return Util::formatCostRelative(cost(column), totalCost(column), true);
+                }
+            } else {
+                if (role == Model::TotalCostRole) {
+                    return cost(baseColumn);
+                } else if (role == Model::SortRole) {
+                    return cost(column) / cost(baseColumn);
+                } else if (role == Qt::DisplayRole) {
+                    return Util::formatCostRelative(cost(column), cost(baseColumn), true);
+                }
+            }
+        }
+
+        return CostProxy<Model>::data(index, role);
     }
 };
